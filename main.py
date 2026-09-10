@@ -1,114 +1,123 @@
-import os
-import asyncio
-
-from dotenv import load_dotenv
 from telethon import TelegramClient, events
-
+from dotenv import load_dotenv
+import os
 
 # Load .env
 load_dotenv()
 
-API_ID = os.getenv("API_ID")
+# Telegram credentials
+API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 
-if not API_ID or not API_HASH:
-    raise ValueError("API_ID or API_HASH is missing from .env")
+# Session name
+SESSION_NAME = "telegram_auto_reply"
 
-API_ID = int(API_ID)
+# Auto reply message
+AUTO_REPLY = (
+    "Hey! 👋 Thanks for messaging me.\n\n"
+    "I'm currently away and may not be able to reply right now. "
+    "Please leave me a message and I'll get back to you as soon as possible.\n\n"
+    "Thanks for understanding! 😊"
+)
 
-
-# Telegram client
+# Create Telegram client
 client = TelegramClient(
-    "telegram_auto_reply",
+    SESSION_NAME,
     API_ID,
     API_HASH
 )
 
-
-# Auto-reply message
-AUTO_REPLY = "TEST AUTO REPLY"
-
-
-# Processed messages
+# Keep track of processed messages
 processed_messages = set()
 
 
-# Incoming private messages
 @client.on(events.NewMessage(incoming=True))
-async def handle_new_message(event):
+async def auto_reply(event):
 
-    if not event.message.text:
-        return
-
+    # Only respond to private messages
     if not event.is_private:
         return
 
-    sender = await event.get_sender()
-
-    if sender is None:
+    # Avoid processing the same message twice
+    if event.id in processed_messages:
         return
 
-    message_id = event.message.id
-
-    if message_id in processed_messages:
-        return
-
-    processed_messages.add(message_id)
-
-    message = event.message.text.strip()
-
-    print()
-    print("=" * 50)
-    print("PRIVATE MESSAGE RECEIVED")
-    print("=" * 50)
-    print(f"From: {sender.first_name}")
-    print(f"Message: {message}")
+    processed_messages.add(event.id)
 
     try:
+        # Get sender information
+        sender = await event.get_sender()
+
+        # Get name
+        first_name = sender.first_name or ""
+        last_name = sender.last_name or ""
+
+        full_name = f"{first_name} {last_name}".strip()
+
+        if not full_name:
+            full_name = "N/A"
+
+        # Get username
+        username = sender.username
+
+        # Get message text
+        message = event.raw_text
+
+        # Print information in terminal
+        print()
+        print("=" * 60)
+        print("PRIVATE MESSAGE RECEIVED")
+        print("=" * 60)
+
+        print(f"User ID  : {sender.id}")
+        print(f"Name     : {full_name}")
+
+        if username:
+            print(f"Username : @{username}")
+        else:
+            print("Username : No username")
+
+        print(f"Message  : {message}")
+
+        # Send auto reply
         await event.reply(AUTO_REPLY)
+
         print("Auto-reply sent successfully.")
+        print("=" * 60)
 
-    except Exception as error:
-        print("ERROR:", error)
-
-    print("=" * 50)
-
-
-# Main
-async def main():
-
-    print("=" * 50)
-    print("TELEGRAM OFFLINE AUTO-REPLY")
-    print("=" * 50)
-
-    print("Connecting to Telegram...")
-
-    await client.start()
-
-    me = await client.get_me()
-
-    print()
-    print(f"Logged in as: {me.first_name}")
-
-    if me.username:
-        print(f"Username: @{me.username}")
-
-    print()
-    print("AUTO-REPLY: ACTIVE")
-    print("Private messages: ACTIVE")
-    print()
-    print("Waiting for private messages...")
-    print("Press CTRL+C to stop.")
-    print()
-
-    await client.run_until_disconnected()
+    except Exception as e:
+        print()
+        print("ERROR:", e)
+        print("=" * 60)
 
 
-# Start
-if __name__ == "__main__":
+# Start Telegram client
+print("=" * 60)
+print("TELEGRAM OFFLINE AUTO-REPLY")
+print("=" * 60)
 
-    try:
-        asyncio.run(main())
+print("Connecting to Telegram...")
 
-    except KeyboardInterrupt:
-        print("\nAuto-reply stopped.")
+client.start()
+
+# Show logged-in account
+me = client.loop.run_until_complete(client.get_me())
+
+print()
+print(f"Logged in as: {me.first_name or 'N/A'}")
+
+if me.username:
+    print(f"Username: @{me.username}")
+else:
+    print("Username: No username")
+
+print()
+print("AUTO-REPLY: ACTIVE")
+print("Private messages: ACTIVE")
+print()
+print("Waiting for private messages...")
+print("Press CTRL+C to stop.")
+print()
+
+# Keep program running
+client.run_until_disconnected()
