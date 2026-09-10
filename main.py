@@ -29,7 +29,7 @@ API_ID = int(API_ID)
 
 
 # ============================================================
-# OPENAI CLIENT
+# OPENAI
 # ============================================================
 
 ai = OpenAI(
@@ -38,7 +38,7 @@ ai = OpenAI(
 
 
 # ============================================================
-# TELEGRAM CLIENT
+# TELEGRAM
 # ============================================================
 
 client = TelegramClient(
@@ -56,73 +56,60 @@ conversation_history = {}
 
 
 # ============================================================
-# PROCESSED MESSAGE TRACKING
+# PROCESSED MESSAGE IDs
 # ============================================================
 
 processed_messages = set()
 
 
 # ============================================================
-# AI RESPONSE FUNCTION
+# GENERATE AI REPLY
 # ============================================================
 
 def generate_reply(chat_id, user_message):
 
-    # Create conversation history for this chat
     if chat_id not in conversation_history:
         conversation_history[chat_id] = []
 
-    # Add user's message
+    # Add user message
     conversation_history[chat_id].append({
         "role": "user",
         "content": user_message
     })
 
-    # Keep only recent messages
+    # Keep recent conversation only
     conversation_history[chat_id] = (
         conversation_history[chat_id][-20:]
     )
 
-    # System instructions
     instructions = """
 You are a friendly personal Telegram assistant.
 
 Reply naturally and conversationally.
 
-Important rules:
+Rules:
 
 1. Understand the language used by the user.
 2. Normally reply in the same language.
-3. If the user mixes languages, respond naturally using the same style.
+3. If the user mixes languages, respond naturally in the same style.
 4. Keep normal replies reasonably short.
 5. Give detailed answers when the user asks for details.
 6. Do not mention that you are an AI unless the user asks.
-7. Do not say you are a Telegram bot.
-8. Be polite, helpful and natural.
-9. Do not repeat the user's message unnecessarily.
+7. Do not say that you are a Telegram bot.
+8. Be friendly, polite and helpful.
+9. Do not unnecessarily repeat the user's message.
 """
 
-    # Create input for OpenAI
-    input_messages = []
-
-    for message in conversation_history[chat_id]:
-        input_messages.append({
-            "role": message["role"],
-            "content": message["content"]
-        })
-
-    # Call OpenAI Responses API
     response = ai.responses.create(
         model="gpt-5.6-luna",
         instructions=instructions,
-        input=input_messages,
+        input=conversation_history[chat_id],
         max_output_tokens=500
     )
 
-    # Get generated text
     reply = response.output_text.strip()
 
-    # Save AI response to memory
+    # Save AI reply
     conversation_history[chat_id].append({
         "role": "assistant",
         "content": reply
@@ -137,7 +124,7 @@ Important rules:
 
 
 # ============================================================
-# INCOMING TELEGRAM MESSAGES
+# HANDLE NEW TELEGRAM MESSAGE
 # ============================================================
 
 @client.on(events.NewMessage(incoming=True))
@@ -147,18 +134,17 @@ async def handle_new_message(event):
     if not event.message.text:
         return
 
-    # Only handle private chats
+    # Only private chats
     if not event.is_private:
         return
 
     # Get sender
     sender = await event.get_sender()
 
-    # Ignore unknown/service messages
     if sender is None:
         return
 
-    # Get message ID
+    # Message ID
     message_id = event.message.id
 
     # Prevent duplicate processing
@@ -167,13 +153,14 @@ async def handle_new_message(event):
 
     processed_messages.add(message_id)
 
-    # Get incoming message
+    # Get message
     incoming_message = event.message.text.strip()
 
     if not incoming_message:
         return
 
-    print("\n" + "=" * 60)
+    print()
+    print("=" * 60)
     print("NEW MESSAGE")
     print("=" * 60)
 
@@ -182,7 +169,7 @@ async def handle_new_message(event):
 
     try:
 
-        # Generate AI reply
+        # Generate AI response
         reply = await asyncio.to_thread(
             generate_reply,
             event.chat_id,
@@ -191,7 +178,7 @@ async def handle_new_message(event):
 
         print(f"AI Reply: {reply}")
 
-        # Send reply
+        # Send AI reply
         await event.reply(reply)
 
         print("Reply sent successfully.")
@@ -200,7 +187,6 @@ async def handle_new_message(event):
 
         print("ERROR:", error)
 
-        # Optional fallback reply
         try:
             await event.reply(
                 "Sorry, I couldn't generate a reply right now."
@@ -212,7 +198,7 @@ async def handle_new_message(event):
 
 
 # ============================================================
-# MAIN FUNCTION
+# MAIN
 # ============================================================
 
 async def main():
@@ -225,7 +211,6 @@ async def main():
 
     await client.start()
 
-    # Get logged-in account
     me = await client.get_me()
 
     print()
@@ -245,12 +230,11 @@ async def main():
     print("Press CTRL+C to stop.")
     print()
 
-    # Keep program running
     await client.run_until_disconnected()
 
 
 # ============================================================
-# RUN PROGRAM
+# START
 # ============================================================
 
 if __name__ == "__main__":
