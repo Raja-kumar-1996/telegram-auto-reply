@@ -3,3 +3,8 @@ venv/
 *.session
 __pycache__/
 *.pyc
+
+.env
+*.session
+history_pdfs/
+__pycache__/
